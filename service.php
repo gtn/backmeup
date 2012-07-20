@@ -1,11 +1,9 @@
 <?php
 require_once dirname(__FILE__) . '/inc.php';
-require_once dirname(__FILE__) . '/lib.php';
-require_once dirname(__FILE__) . '/sharelib.php';
+require_once dirname(__FILE__) . '/lib/lib.php';
 require_once($CFG->dirroot.'/course/lib.php');
 require_once($CFG->dirroot.'/mod/resource/lib.php');
 global $DB,$user,$COURSE;
-
 
 $uname = optional_param('username', 0, PARAM_USERNAME);  //100
 $pword = optional_param('password', 0, PARAM_ALPHANUM);	//32
@@ -17,53 +15,65 @@ if ($uname!="0" && $pword!="0"){
 		if($action == "auth")
 			bmu_write_auth_xml(true);
 		else if($action == "list") {
-			//create directory for the temp
-			$exportdir = make_upload_directory(bmu_data_file_area_name());
+			//create directory for the temp files
+			$tempdir = bmu_data_file_area_name(); //relative path
+			$tempdir_absolute = make_upload_directory($tempdir); //absolute path
 
-			// create directory for the zip-files:
-			$zipdir = make_upload_directory(bmu_zip_area_name());
-			// Delete everything inside
-			remove_dir($zipdir, true);
-			// Put a / on the end
-			if (substr($zipdir, -1) != "/")
-				$zipdir .= "/";
+			remove_dir($tempdir_absolute, true);
 
 			$courses = enrol_get_users_courses($user->id, 'visible DESC,sortorder ASC', '*', false, 21);
 			$modules = array();
 			foreach($DB->get_records("modules") as $module)
 				$modules[$module->name] = $module->id;
 
-			bmu_write_xml_header();
-			echo '<courses>';
-
+			Header('Content-type: text/xml');
+			$xml_courses = new SimpleXMLElement("<courses></courses>");
 			foreach($courses as $course) {
+				$xml_course = $xml_courses->addChild("course");
+				$xml_course->addAttribute("id", $course->id);
+				$xml_course->addAttribute("name", $course->fullname);
 				$sections = get_all_sections($course->id);
 				foreach($sections as $section) {
+					$xml_section = $xml_course->addChild("section");
+					$xml_section->addAttribute("id", $section->id);
+					$xml_section->addAttribute("name", get_section_name($course, $section));
+					$xml_section->addAttribute("summary", strip_tags($section->summary));
 					if($section->sequence && $section->visible) {
 						$sequences = explode(',', $section->sequence);
 						//Create Directories for each Course
 						if($sequences) {
-							$coursedir = $exportdir."/".$course->fullname;
+							$coursedir = $tempdir_absolute."/".filenameReplaceBadChars($course->fullname);
 							if(!is_dir($coursedir))
 								mkdir($coursedir);
+							$portfoliofile = $CFG->wwwroot . '/blocks/backmeup/portfoliofile.php/' . $tempdir . '/' . rawurlencode(filenameReplaceBadChars($course->fullname));
 						}
 						foreach($sequences as $sequence) {
 							$sequence = $DB->get_record('course_modules',array("id"=>$sequence,"visible"=>1));
-							if($sequence) {
+							if($sequence && bmu_sequence_available($sequence, $course->id)) {
+								$xml_sequence = $xml_section->addChild("sequence");
+								$xml_sequence->addAttribute("id", $sequence->id);
+								$xml_sequence->addChild("indent",$sequence->indent);
 								switch($sequence->module) {
 									// page
 									case $modules['page']:
 										$page = $DB->get_record('page',array("id"=>$sequence->instance));
 										if($page) {
 											//create html file
-											$pagefile = fopen($coursedir."/".$page->name.".html", 'w');
+											$pagefile = fopen($coursedir."/".filenameReplaceBadChars($page->name).".html", 'w');
 											//write content to file
 											fwrite($pagefile, $page->content);
 											fclose($pagefile);
+											$xml_sequence->addChild("name",$page->name);
+											$xml_sequence->addChild("name","page");
+											$xml_sequence->addChild("intro",$page->intro);
+											$xml_data = $xml_sequence->addChild("data");
+											$xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($page->name)).'.html');
 										}
 										break;
 										// resource
 									case $modules['resource']:
+										//get resource
+										$resource = $DB->get_record('resource',array("id"=>$sequence->instance));
 										//get file
 										$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
 										if (!has_capability('mod/resource:view', $context))
@@ -78,29 +88,33 @@ if ($uname!="0" && $pword!="0"){
 										$newfile=$coursedir."/".$file->get_filename();
 										$file->copy_content_to($newfile);
 
+										$xml_sequence->addChild("name",$resource->name);
+										$xml_sequence->addChild("type","resource");
+										$xml_sequence->addChild("intro",$resource->intro);
+										$xml_data = $xml_sequence->addChild("data");
+										$xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
+
+										break;
+									case $modules['folder']:
+										$folder = $DB->get_record('folder',array("id"=>$sequence->instance));
+
+										$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+										$dir = $fs->get_area_tree($context->id, 'mod_folder', 'content', 0);
+
+										$xml_sequence->addChild("name",filenameReplaceBadChars($folder->name));
+										$xml_sequence->addChild("type","folder");
+										$xml_sequence->addChild("intro",$folder->intro);
+										$xml_data = $xml_sequence->addChild("data");
+										xmllize_tree($xml_data,$dir,$coursedir,$portfoliofile,($folder->name));
+
 										break;
 								}//end switch
 							}
 						}
 					}
 				}
-				// ZIP
-				$zipname = bmu_valid_zip_name($user->username . "_" . $course->fullname . "_" . date("o_m_d_H_i") . ".zip");
-
-				$zipfiles = array();
-				$zipfiles[] = $coursedir;
-					
-				// zip all the files:
-				zip_files($zipfiles, $zipdir . $zipname);
-
-				echo '<course>';
-				echo '<name>'.$course->fullname.'</name>';
-				echo '<url>'.$CFG->wwwroot . '/blocks/backmeup/portfoliofile.php/' . bmu_zip_area_name() . '/' . $zipname.'</url>';
-				echo '</course>';
-
 			}
-			echo '</courses>';
-			remove_dir($exportdir);
+			echo $xml_courses->asXML();
 		}
 			
 	}
@@ -115,27 +129,14 @@ function bmu_check_login($uname, $pword) {
 	$conditions = array("username" => $uname,"password" => $pword);
 	return ($user = $DB->get_record("user", $conditions)) ? true : false;
 }
-function bmu_write_xml_header() {
-	header ("Content-Type:text/xml");
-
-	echo '<?xml version="1.0" encoding="UTF-8" ?>'."\r\n";
-}
 function bmu_write_auth_xml($valid){
-
-	bmu_write_xml_header();
-
-	$inhalt='<result>';
-	if($valid)
-		$inhalt.='true';
-	else
-		$inhalt.='false';
-	$inhalt.='</result> '."\r\n";
-	echo $inhalt;
-
+	Header('Content-type: text/xml');
+	$xml = new SimpleXMLElement("<result>".var_export($valid, true)."</result>");
+	echo $xml->asXML();
 }
 function bmu_data_file_area_name() {
 	global $user;
-	return "bmu/temp/exportdata/{$user->username}_".date("o_m_d H_i");
+	return "bmu/temp/exportdata/{$user->username}_".date("o_m_d_H_i");
 }
 function bmu_zip_area_name() {
 	global $user;
@@ -145,5 +146,50 @@ function bmu_valid_zip_name($zipname) {
 	$zipname = str_replace(" ","",$zipname);
 	$zipname = str_replace("#","",$zipname);
 	return $zipname;
+}
+function bmu_sequence_available($item, $courseid) {
+	global $CFG,$user;
+	$modcontext = get_context_instance(CONTEXT_MODULE, $item->id);
+	$available = true;
+	// Test dates
+	if ($item->availablefrom) {
+		if (time() < $item->availablefrom) {
+			return false;
+		}
+	}
+
+	if ($item->availableuntil) {
+		if (time() >= $item->availableuntil) {
+			return false;
+		}
+	}
+	if (!$item->visible and
+			!has_capability('moodle/course:viewhiddenactivities', $modcontext, $user->id)) {
+		return false;
+	} else if (!empty($CFG->enablegroupmembersonly) and !empty($item->groupmembersonly)
+			and !has_capability('moodle/site:accessallgroups', $modcontext, $user->id)) {
+		// If the activity has 'group members only' and you don't have accessallgroups...
+		$groups = groups_get_user_groups($courseid, $user->id);
+		if (!isset($groups[$item->groupingid])) {
+			return false;
+		}
+	}
+	return true;
+}
+function xmllize_tree($parent_element,$dir,$coursedir,$portfoliofile,$foldername) {
+	$newfile_dir=$coursedir."/".rawurldecode(filenameReplaceBadChars($foldername))."/";
+	if(!is_dir($newfile_dir))
+		mkdir($newfile_dir);
+	foreach ($dir['subdirs'] as $subdir) {
+		xmllize_tree($parent_element, $subdir, $coursedir, $portfoliofile,rawurlencode(filenameReplaceBadChars($foldername))."/".rawurlencode(filenameReplaceBadChars($subdir['dirname'])));
+	}
+	foreach ($dir['files'] as $file) {
+		//copy file
+		$newfile = $newfile_dir . $file->get_filename();
+		$file->copy_content_to($newfile);
+		$url = $portfoliofile ."/". rawurlencode(filenameReplaceBadChars($foldername)) . "/" .rawurlencode($file->get_filename());
+		$xml_file = $parent_element->addChild("file",$url);
+		$xml_file->addAttribute("path",$foldername);
+	}
 }
 ?>
