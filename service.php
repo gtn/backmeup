@@ -61,10 +61,10 @@ if ($uname!="0" && $pword!="0"){
 											//create html file
 											$pagefile = fopen($coursedir."/".filenameReplaceBadChars($page->name).".html", 'w');
 											//write content to file
-											fwrite($pagefile, $page->content);
+											fwrite($pagefile, utf8_decode($page->content));
 											fclose($pagefile);
 											$xml_sequence->addChild("name",$page->name);
-											$xml_sequence->addChild("name","page");
+											$xml_sequence->addChild("type","page");
 											$xml_sequence->addChild("intro",$page->intro);
 											$xml_data = $xml_sequence->addChild("data");
 											$xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($page->name)).'.html');
