@@ -22,9 +22,7 @@ if ($uname!="0" && $pword!="0"){
 			remove_dir($tempdir_absolute, true);
 
 			$courses = enrol_get_users_courses($user->id, 'visible DESC,sortorder ASC', '*', false, 21);
-			$modules = array();
-			foreach($DB->get_records("modules") as $module)
-				$modules[$module->name] = $module->id;
+			$modules = bmu_get_supported_modules();
 
 			Header('Content-type: text/xml');
 			$xml_courses = new SimpleXMLElement("<courses></courses>");
@@ -49,25 +47,75 @@ if ($uname!="0" && $pword!="0"){
 						}
 						foreach($sequences as $sequence) {
 							$sequence = $DB->get_record('course_modules',array("id"=>$sequence,"visible"=>1));
-							if($sequence && bmu_sequence_available($sequence, $course->id)) {
+							if($sequence && bmu_sequence_available($sequence, $course->id) && in_array($sequence->module,$modules)) {
 								$xml_sequence = $xml_section->addChild("sequence");
 								$xml_sequence->addAttribute("id", $sequence->id);
 								$xml_sequence->addChild("indent",$sequence->indent);
 								switch($sequence->module) {
-									// page
+									// url
+									case $modules['url']:
+										$url = $DB->get_record('url',array("id"=>$sequence->instance));
+										if($url) {
+											//create html file
+											$pagefile = fopen($coursedir."/".filenameReplaceBadChars($url->name).".html", 'w');
+											//write content to file
+											fwrite($pagefile, "<a href='".$url->externalurl."'>".$url->externalurl."</a>");
+											fclose($pagefile);
+											$xml_sequence->addChild("name",$url->name);
+											$xml_sequence->addChild("type","url");
+											$xml_sequence->addChild("intro",$url->intro);
+											$xml_data = $xml_sequence->addChild("data");
+											$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($url->name)).'.html');
+											$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$url->timemodified));
+										}
+										break;
+										// page
 									case $modules['page']:
 										$page = $DB->get_record('page',array("id"=>$sequence->instance));
 										if($page) {
-											//create html file
-											$pagefile = fopen($coursedir."/".filenameReplaceBadChars($page->name).".html", 'w');
-											//write content to file
-											fwrite($pagefile, utf8_decode($page->content));
-											fclose($pagefile);
+											bmu_create_html_file($coursedir,$page->name,$page->content);
+												
 											$xml_sequence->addChild("name",$page->name);
 											$xml_sequence->addChild("type","page");
 											$xml_sequence->addChild("intro",$page->intro);
 											$xml_data = $xml_sequence->addChild("data");
-											$xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($page->name)).'.html');
+											$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($page->name)).'.html');
+											$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$page->timemodified));
+										}
+										break;
+										// assign
+									case $modules['assign']:
+										$assign = $DB->get_record('assign',array("id"=>$sequence->instance));
+										$submission = $DB->get_record('assign_submission',array("userid"=>$user->id,"assignment"=>$assign->id));
+										if($submission) {
+											$xml_sequence->addChild("name",$assign->name);
+											$xml_sequence->addChild("type","assign");
+											$xml_sequence->addChild("intro",$assign->intro);
+											$xml_data = $xml_sequence->addChild("data");
+												
+											// check if files are submitted
+											$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+											$fs = get_file_storage();
+											$files = $fs->get_area_files($context->id, 'assignsubmission_file', 'submission_files');
+
+											foreach($files as $file) {
+												if($file->get_userid() == $user->id && $file->get_filename() != '.') {
+													//copy file
+													$newfile=$coursedir."/".$file->get_filename();
+													$file->copy_content_to($newfile);
+
+													$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
+													$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$submission->timemodified));
+												}
+											}
+												
+											// check if online-texts are submitted
+											if($onlinetext = $DB->get_record('assignsubmission_onlinetext',array("assignment"=>$assign->id,"submission"=>$submission->id))) {
+												bmu_create_html_file($coursedir,$assign->name,$onlinetext->onlinetext);
+
+												$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode(filenameReplaceBadChars($assign->name)).'.html');
+												$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$submission->timemodified));
+											}
 										}
 										break;
 										// resource
@@ -92,7 +140,8 @@ if ($uname!="0" && $pword!="0"){
 										$xml_sequence->addChild("type","resource");
 										$xml_sequence->addChild("intro",$resource->intro);
 										$xml_data = $xml_sequence->addChild("data");
-										$xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
+										$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
+										$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$resource->timemodified));
 
 										break;
 									case $modules['folder']:
@@ -133,6 +182,15 @@ function bmu_write_auth_xml($valid){
 	Header('Content-type: text/xml');
 	$xml = new SimpleXMLElement("<result>".var_export($valid, true)."</result>");
 	echo $xml->asXML();
+}
+function bmu_get_supported_modules() {
+	global $DB;
+	$modules=array();
+	foreach($DB->get_records("modules") as $module)
+		if(in_array($module->name,array("url","page","resource","folder","assign")))
+			$modules[$module->name] = $module->id;
+	
+	return $modules;
 }
 function bmu_data_file_area_name() {
 	global $user;
@@ -190,6 +248,15 @@ function xmllize_tree($parent_element,$dir,$coursedir,$portfoliofile,$foldername
 		$url = $portfoliofile ."/". rawurlencode(filenameReplaceBadChars($foldername)) . "/" .rawurlencode($file->get_filename());
 		$xml_file = $parent_element->addChild("file",$url);
 		$xml_file->addAttribute("path",$foldername);
+		$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$file->get_timemodified()));
 	}
 }
+function bmu_create_html_file($path,$filename,$content) {
+	//create html file
+	$pagefile = fopen($path."/".filenameReplaceBadChars($filename).".html", 'w');
+	//write content to file
+	fwrite($pagefile, utf8_decode($content));
+	fclose($pagefile);
+}
+
 ?>
