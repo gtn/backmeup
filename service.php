@@ -25,7 +25,8 @@ if ($uname!="0" && $pword!="0"){
 			$modules = bmu_get_supported_modules();
 
 			Header('Content-type: text/xml');
-			$xml_courses = new SimpleXMLElement("<courses></courses>");
+			$xml = new SimpleXMLElement("<backmeup></backmeup>");
+			$xml_courses = $xml->addChild("courses");
 			//scorm manifest
 			$scorm_manifest = scorm_create_manifest();
 			$scorm_courses = $scorm_manifest->addChild('organizations');
@@ -188,7 +189,7 @@ if ($uname!="0" && $pword!="0"){
 										$xml_sequence->addChild("intro",$folder->intro);
 										$xml_data = $xml_sequence->addChild("data");
 										
-										$scorm_folder = scorm_create_item($scorm_section, 'ITEM-folder-'.$course->id.'-'.$folder->id, htmlentities($folder->name));
+										$scorm_folder = scorm_create_item($scorm_section, 'ITEM-folder-'.$course->id.'-'.$folder->id, filenameReplaceBadChars($folder->name));
 										
 										xmllize_tree($xml_data,$dir,$coursedir,$portfoliofile,$folder->name,$scorm_folder,$course,$resources);
 
@@ -202,7 +203,14 @@ if ($uname!="0" && $pword!="0"){
 			//scorm file erstellen
 			bmu_create_scorm_file($tempdir_absolute,$scorm_manifest);
 			
-			echo $xml_courses->asXML();
+			$xml_scorm = $xml->addChild("scorm");
+			$portfoliofile = $CFG->wwwroot . '/blocks/backmeup/portfoliofile.php/' . $tempdir . '/';
+			$xml_scorm->addChild("file",$portfoliofile."imsmanifest.xml");
+			$xml_scorm->addChild("file",$portfoliofile."adlcp_rootv1p2.xsd");
+			$xml_scorm->addChild("file",$portfoliofile."ims_xml.xsd");
+			$xml_scorm->addChild("file",$portfoliofile."imscp_rootv1p1p2.xsd");
+			$xml_scorm->addChild("file",$portfoliofile."imsmd_rootv1p2p1.xsd");
+			echo $xml->asXML();
 		}
 			
 	}
