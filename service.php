@@ -1,8 +1,11 @@
 <?php
+
 require_once dirname(__FILE__) . '/inc.php';
 require_once dirname(__FILE__) . '/lib/lib.php';
 require_once($CFG->dirroot.'/course/lib.php');
 require_once($CFG->dirroot.'/mod/resource/lib.php');
+require_once($CFG->dirroot.'/mod/wiki/locallib.php');
+
 global $DB,$user,$COURSE;
 
 $uname = optional_param('username', 0, PARAM_USERNAME);  //100
@@ -24,7 +27,7 @@ if ($uname!="0" && $pword!="0"){
 			$courses = enrol_get_users_courses($user->id, 'visible DESC,sortorder ASC', '*', false, 21);
 			$modules = bmu_get_supported_modules();
 
-			Header('Content-type: text/xml');
+			//Header('Content-type: text/xml');
 			$xml = new SimpleXMLElement("<backmeup></backmeup>");
 			$xml_courses = $xml->addChild("courses");
 			//scorm manifest
@@ -35,19 +38,19 @@ if ($uname!="0" && $pword!="0"){
 				$xml_course = $xml_courses->addChild("course");
 				$xml_course->addAttribute("id", $course->id);
 				$xml_course->addAttribute("name", $course->fullname);
-				
+
 				$scorm_course = $scorm_courses->addChild("organization");
 				$scorm_course->addAttribute('identifier', 'COURSE-'.$course->id);
 				$scorm_course->addChild('title',$course->fullname);
-				
-				
+
+
 				$sections = get_all_sections($course->id);
 				foreach($sections as $section) {
 					$xml_section = $xml_course->addChild("section");
 					$xml_section->addAttribute("id", $section->id);
 					$xml_section->addAttribute("name", get_section_name($course, $section));
 					$xml_section->addAttribute("summary", strip_tags($section->summary));
-					
+
 					$scorm_section = scorm_create_item($scorm_course, 'ITEM-section-'.$course->id.'-'.$section->id, get_section_name($course,$section));
 					if($section->sequence && $section->visible) {
 						$sequences = explode(',', $section->sequence);
@@ -64,9 +67,35 @@ if ($uname!="0" && $pword!="0"){
 								$xml_sequence = $xml_section->addChild("sequence");
 								$xml_sequence->addAttribute("id", $sequence->id);
 								$xml_sequence->addChild("indent",$sequence->indent);
-								
+
 								switch($sequence->module) {
-									// url
+									// wiki
+									case $modules['wiki']:
+										$wiki = wiki_get_wiki($sequence->instance);
+										$cm = get_coursemodule_from_instance("wiki", $sequence->instance);
+										$wikifile = fopen($coursedir."/".filenameReplaceBadChars($wiki->name).".html", 'w');
+
+										$subwikis = wiki_get_subwikis($sequence->instance);
+										foreach($subwikis as $subwiki) {
+											$pages = wiki_get_page_list($subwiki->id);
+											foreach($pages as $page) {
+												fwrite($wikifile,'<h1 id="wiki_printable_title">' . $page->title . '</h1>');
+												
+												$version = wiki_get_current_version($page->id);
+												$content = wiki_parse_content($version->contentformat, $version->content, array('printable' => true, 'swid' => $subwiki->id, 'pageid' => $page->id, 'pretty_print' => true));
+												
+												$html = '<div id="wiki_printable_content">';
+												$html .= $content['parsed_text'];
+												$html .= '</div>';
+												
+												//nach bildern/dateien parsen
+												//file_rewrite_pluginfile_urls !!
+												fwrite($wikifile,$html);
+											}
+										}
+										fclose($wikifile);
+										break;
+										// url
 									case $modules['url']:
 										$url = $DB->get_record('url',array("id"=>$sequence->instance));
 										if($url) {
@@ -82,7 +111,7 @@ if ($uname!="0" && $pword!="0"){
 											$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($url->name)).'.html');
 											$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$url->timemodified));
 											$xml_file->addAttribute("mime","text/html");
-											
+
 											scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($url->name).".html");
 											$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $url->name,'RES-'.$course->id.'-'.$sequence->id);
 										}
@@ -92,7 +121,7 @@ if ($uname!="0" && $pword!="0"){
 										$page = $DB->get_record('page',array("id"=>$sequence->instance));
 										if($page) {
 											bmu_create_html_file($coursedir,$page->name,$page->content);
-												
+
 											$xml_sequence->addChild("name",$page->name);
 											$xml_sequence->addChild("type","page");
 											$xml_sequence->addChild("intro",$page->intro);
@@ -100,7 +129,7 @@ if ($uname!="0" && $pword!="0"){
 											$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($page->name)).'.html');
 											$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$page->timemodified));
 											$xml_file->addAttribute("mime","text/html");
-											
+
 											scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($page->name).".html");
 											$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $page->name,'RES-'.$course->id.'-'.$sequence->id);
 										}
@@ -114,7 +143,7 @@ if ($uname!="0" && $pword!="0"){
 											$xml_sequence->addChild("type","assign");
 											$xml_sequence->addChild("intro",$assign->intro);
 											$xml_data = $xml_sequence->addChild("data");
-												
+
 											// check if files are submitted
 											$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
 											$fs = get_file_storage();
@@ -129,12 +158,12 @@ if ($uname!="0" && $pword!="0"){
 													$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
 													$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$submission->timemodified));
 													$xml_file->addAttribute("mime", $file->get_mimetype());
-													
+
 													scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id.'-'.$file->get_itemid(), "/".filenameReplaceBadChars($course->fullname)."/".$file->get_filename());
 													$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequencefile-'.$course->id.'-'.$sequence->id.'-'.$file->get_itemid(), $file->get_filename(),'RES-'.$course->id.'-'.$sequence->id.'-'.$file->get_itemid());
 												}
 											}
-												
+
 											// check if online-texts are submitted
 											if($onlinetext = $DB->get_record('assignsubmission_onlinetext',array("assignment"=>$assign->id,"submission"=>$submission->id))) {
 												bmu_create_html_file($coursedir,$assign->name,$onlinetext->onlinetext);
@@ -142,7 +171,7 @@ if ($uname!="0" && $pword!="0"){
 												$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode(filenameReplaceBadChars($assign->name)).'.html');
 												$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$submission->timemodified));
 												$xml_file->addAttribute("mime", "text/html");
-												
+
 												scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($assign->name).".html");
 												$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $assign->name,'RES-'.$course->id.'-'.$sequence->id);
 											}
@@ -173,10 +202,10 @@ if ($uname!="0" && $pword!="0"){
 										$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
 										$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$resource->timemodified));
 										$xml_file->addAttribute("mime", $file->get_mimetype());
-										
+
 										scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".$file->get_filename());
 										$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $file->get_filename(),'RES-'.$course->id.'-'.$sequence->id);
-										
+
 										break;
 									case $modules['folder']:
 										$folder = $DB->get_record('folder',array("id"=>$sequence->instance));
@@ -188,9 +217,9 @@ if ($uname!="0" && $pword!="0"){
 										$xml_sequence->addChild("type","folder");
 										$xml_sequence->addChild("intro",$folder->intro);
 										$xml_data = $xml_sequence->addChild("data");
-										
+
 										$scorm_folder = scorm_create_item($scorm_section, 'ITEM-folder-'.$course->id.'-'.$folder->id, filenameReplaceBadChars($folder->name));
-										
+
 										xmllize_tree($xml_data,$dir,$coursedir,$portfoliofile,$folder->name,$scorm_folder,$course,$resources);
 
 										break;
@@ -202,7 +231,7 @@ if ($uname!="0" && $pword!="0"){
 			}
 			//scorm file erstellen
 			bmu_create_scorm_file($tempdir_absolute,$scorm_manifest);
-			
+
 			$xml_scorm = $xml->addChild("scorm");
 			$portfoliofile = $CFG->wwwroot . '/blocks/backmeup/portfoliofile.php/' . $tempdir . '/';
 			$xml_scorm->addChild("file",$portfoliofile."imsmanifest.xml");
@@ -234,9 +263,9 @@ function bmu_get_supported_modules() {
 	global $DB;
 	$modules=array();
 	foreach($DB->get_records("modules") as $module)
-		if(in_array($module->name,array("url","page","resource","folder","assign")))
-			$modules[$module->name] = $module->id;
-	
+		if(in_array($module->name,array("url","page","resource","folder","assign","wiki")))
+		$modules[$module->name] = $module->id;
+
 	return $modules;
 }
 function bmu_data_file_area_name() {
@@ -286,7 +315,7 @@ function xmllize_tree($parent_element,$dir,$coursedir,$portfoliofile,$foldername
 	if(!is_dir($newfile_dir))
 		mkdir($newfile_dir);
 	foreach ($dir['subdirs'] as $subdir) {
-		
+
 		$scorm_subfolder = scorm_create_item($parent_scorm, 'ITEM-subfolder-'.$course->id, rawurlencode(filenameReplaceBadChars($subdir['dirname'])));
 		xmllize_tree($parent_element, $subdir, $coursedir, $portfoliofile,rawurlencode(filenameReplaceBadChars($foldername))."/".rawurlencode(filenameReplaceBadChars($subdir['dirname'])),$scorm_subfolder,$course,$resources);
 	}
@@ -299,10 +328,10 @@ function xmllize_tree($parent_element,$dir,$coursedir,$portfoliofile,$foldername
 		$xml_file->addAttribute("path",$foldername);
 		$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$file->get_timemodified()));
 		$xml_file->addAttribute("mime",$file->get_mimetype());
-		
+
 		scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$file->get_id(), "/".filenameReplaceBadChars($course->fullname)."/".$foldername."/".$file->get_filename());
 		$scorm_sequence = scorm_create_item($parent_scorm, 'ITEM-folderfile-'.$course->id.'-'.$file->get_id(), $file->get_filename(),'RES-'.$course->id.'-'.$file->get_id());
-		
+
 	}
 }
 function bmu_create_html_file($path,$filename,$content) {
@@ -313,20 +342,20 @@ function bmu_create_html_file($path,$filename,$content) {
 	fclose($pagefile);
 }
 function bmu_create_scorm_file($path,$xml) {
-	
+
 	// copy all necessary files
 	copy("scorm/adlcp_rootv1p2.xsd", $path . "/adlcp_rootv1p2.xsd");
 	copy("scorm/ims_xml.xsd", $path . "/ims_xml.xsd");
 	copy("scorm/imscp_rootv1p1p2.xsd", $path . "/imscp_rootv1p1p2.xsd");
 	copy("scorm/imsmd_rootv1p2p1.xsd", $path . "/imsmd_rootv1p2p1.xsd");
-	
+
 	$xmlfile = fopen($path."/imsmanifest.xml","w");
 	$xml_stringcontent = $xml->asXML();
 	$xml_stringcontent = str_replace("adlcp=", "xmlns:adlcp=", $xml_stringcontent);
 	$xml_stringcontent = str_replace("xsi", "xmlns:xsi", $xml_stringcontent);
 	$xml_stringcontent = str_replace('schemaLocation=""', 'xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd
-					  http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd
-					  http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd"', $xml_stringcontent);
+			http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd
+			http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd"', $xml_stringcontent);
 	$xml_stringcontent = str_replace('<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-8"?>', $xml_stringcontent);
 	$xml_stringcontent = str_replace('scormtype=','adlcp:scormtype=',$xml_stringcontent);
 	fwrite($xmlfile,$xml_stringcontent);
