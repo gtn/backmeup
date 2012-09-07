@@ -27,7 +27,7 @@ if ($uname!="0" && $pword!="0"){
 			$courses = enrol_get_users_courses($user->id, 'visible DESC,sortorder ASC', '*', false, 21);
 			$modules = bmu_get_supported_modules();
 
-			//Header('Content-type: text/xml');
+			Header('Content-type: text/xml');
 			$xml = new SimpleXMLElement("<backmeup></backmeup>");
 			$xml_courses = $xml->addChild("courses");
 			//scorm manifest
@@ -73,27 +73,50 @@ if ($uname!="0" && $pword!="0"){
 									case $modules['wiki']:
 										$wiki = wiki_get_wiki($sequence->instance);
 										$cm = get_coursemodule_from_instance("wiki", $sequence->instance);
-										$wikifile = fopen($coursedir."/".filenameReplaceBadChars($wiki->name).".html", 'w');
-
+										$wikicontext = get_context_instance(CONTEXT_MODULE, $cm->id);
+										$wikicontent="";
 										$subwikis = wiki_get_subwikis($sequence->instance);
 										foreach($subwikis as $subwiki) {
-											$pages = wiki_get_page_list($subwiki->id);
+											$pages = $DB->get_records('wiki_pages',array("subwikiid"=>$subwiki->id));
 											foreach($pages as $page) {
-												fwrite($wikifile,'<h1 id="wiki_printable_title">' . $page->title . '</h1>');
-												
+
+												$wikicontent .= '<h1 id="wiki_printable_title">' . $page->title . '</h1>';
+
 												$version = wiki_get_current_version($page->id);
 												$content = wiki_parse_content($version->contentformat, $version->content, array('printable' => true, 'swid' => $subwiki->id, 'pageid' => $page->id, 'pretty_print' => true));
-												
-												$html = '<div id="wiki_printable_content">';
-												$html .= $content['parsed_text'];
-												$html .= '</div>';
-												
-												//nach bildern/dateien parsen
-												//file_rewrite_pluginfile_urls !!
-												fwrite($wikifile,$html);
+
+												$wikicontent .= '<div id="wiki_printable_content">';
+												$wikicontent .= $content['parsed_text'];
+												$wikicontent .= '</div>';
+
+												$wikicontent = file_rewrite_pluginfile_urls($wikicontent, 'pluginfile.php', $wikicontext->id, 'mod_wiki', 'attachments', $subwiki->id);
+
+												$images = bmu_get_images($wikicontent);
+												foreach($images as $filename => $url) {
+													if(strpos($url, $CFG->wwwroot) === 0) {
+														$fs = get_file_storage();
+														$urlparts = explode("/",$url);
+														$file = $fs->get_file($wikicontext->id, 'mod_wiki', 'attachments', $urlparts[8], "/", $filename);
+														file_put_contents($coursedir."/".$filename,$file->get_content());
+													} else {
+														$file = file_get_contents($url);
+														file_put_contents($coursedir."/".$filename,$file);
+													}
+													$wikicontent = str_replace($url, $filename, $wikicontent);
+												}
 											}
 										}
-										fclose($wikifile);
+										bmu_create_html_file($coursedir,$wiki->name,$wikicontent);
+										$xml_sequence->addChild("name",$wiki->name);
+										$xml_sequence->addChild("type","wiki");
+										$xml_sequence->addChild("intro",$wiki->intro);
+										$xml_data = $xml_sequence->addChild("data");
+										$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($wiki->name)).'.html');
+										$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$page->timemodified));
+										$xml_file->addAttribute("mime","text/html");
+										
+										scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($wiki->name).".html");
+										$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $wiki->name,'RES-'.$course->id.'-'.$sequence->id);
 										break;
 										// url
 									case $modules['url']:
@@ -120,6 +143,24 @@ if ($uname!="0" && $pword!="0"){
 									case $modules['page']:
 										$page = $DB->get_record('page',array("id"=>$sequence->instance));
 										if($page) {
+											$cm = get_coursemodule_from_instance("page", $sequence->instance);
+											$pagecontext = get_context_instance(CONTEXT_MODULE, $cm->id);
+												
+											$page->content = file_rewrite_pluginfile_urls($page->content, 'pluginfile.php', $pagecontext->id, 'mod_page', 'content', 0);
+
+											$images = bmu_get_images($page->content);
+											foreach($images as $filename => $url) {
+												if(strpos($url, $CFG->wwwroot) === 0) {
+													$fs = get_file_storage();
+													$urlparts = explode("/",$url);
+													$file = $fs->get_file($pagecontext->id, 'mod_page', 'content', 0, "/", $filename);
+													file_put_contents($coursedir."/".$filename,$file->get_content());
+												} else {
+													$file = file_get_contents($url);
+													file_put_contents($coursedir."/".$filename,$file);
+												}
+												$page->content = str_replace($url, $filename, $page->content);
+											}
 											bmu_create_html_file($coursedir,$page->name,$page->content);
 
 											$xml_sequence->addChild("name",$page->name);
@@ -249,6 +290,28 @@ if ($uname!="0" && $pword!="0"){
 }else{
 	bmu_write_auth_xml(false);
 }
+function bmu_get_images($data) {
+	$images = array();
+	preg_match_all('/(img|src)=("|\')[^"\'>]+/i', $data, $media);
+	unset($data);
+	$data=preg_replace('/(img|src)("|\'|="|=\')(.*)/i',"$3",$media[0]);
+	foreach($data as $url)
+	{
+		$info = pathinfo($url);
+			
+		if (isset($info['extension']) && $info['dirname']!=='.')
+		{
+			if (($info['extension'] == 'jpg') ||
+					($info['extension'] == 'jpeg') ||
+					($info['extension'] == 'gif') ||
+					($info['extension'] == 'png')) {
+				$filename = filenameReplaceBadChars($info['filename'].'.'.$info['extension']);
+				$images[$filename] = $url;
+			}
+		}
+	}
+	return $images;
+}
 function bmu_check_login($uname, $pword) {
 	global $user,$DB;
 	$conditions = array("username" => $uname,"password" => $pword);
@@ -334,12 +397,15 @@ function xmllize_tree($parent_element,$dir,$coursedir,$portfoliofile,$foldername
 
 	}
 }
-function bmu_create_html_file($path,$filename,$content) {
+function bmu_create_file($path,$filename,$content) {
 	//create html file
-	$pagefile = fopen($path."/".filenameReplaceBadChars($filename).".html", 'w');
+	$file = fopen($path."/".filenameReplaceBadChars($filename), 'w');
 	//write content to file
-	fwrite($pagefile, utf8_decode($content));
-	fclose($pagefile);
+	fwrite($file, utf8_decode($content));
+	fclose($file);
+}
+function bmu_create_html_file($path,$filename,$content) {
+	bmu_create_file($path,$filename.".html",$content);
 }
 function bmu_create_scorm_file($path,$xml) {
 
@@ -410,5 +476,8 @@ function scorm_create_manifest() {
 	$manifest->addAttribute('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
 	$manifest->addAttribute('xsi:schemaLocation', '');
 	return $manifest;
+}
+function bmu_replace_img_urls($content) {
+
 }
 ?>
