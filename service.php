@@ -117,6 +117,7 @@ if ($uname!="0" && $pword!="0"){
 										
 										scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($wiki->name).".html");
 										$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $wiki->name,'RES-'.$course->id.'-'.$sequence->id);
+										unset($wiki,$cm,$wikicontent,$wikicontext,$images,$pages,$subwikis);
 										break;
 										// url
 									case $modules['url']:
@@ -138,6 +139,7 @@ if ($uname!="0" && $pword!="0"){
 											scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($url->name).".html");
 											$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $url->name,'RES-'.$course->id.'-'.$sequence->id);
 										}
+										unset($url);
 										break;
 										// page
 									case $modules['page']:
@@ -174,6 +176,7 @@ if ($uname!="0" && $pword!="0"){
 											scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($page->name).".html");
 											$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $page->name,'RES-'.$course->id.'-'.$sequence->id);
 										}
+										unset($page,$cm,$pagecontext,$images,$file,$filename);
 										break;
 										// assign
 									case $modules['assign']:
@@ -217,6 +220,7 @@ if ($uname!="0" && $pword!="0"){
 												$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $assign->name,'RES-'.$course->id.'-'.$sequence->id);
 											}
 										}
+										unset($assign,$submission,$context,$files,$onlinetext);
 										break;
 										// resource
 									case $modules['resource']:
@@ -247,6 +251,7 @@ if ($uname!="0" && $pword!="0"){
 										scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".$file->get_filename());
 										$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $file->get_filename(),'RES-'.$course->id.'-'.$sequence->id);
 
+										unset($resource,$context,$files);
 										break;
 									case $modules['folder']:
 										$folder = $DB->get_record('folder',array("id"=>$sequence->instance));
@@ -262,7 +267,7 @@ if ($uname!="0" && $pword!="0"){
 										$scorm_folder = scorm_create_item($scorm_section, 'ITEM-folder-'.$course->id.'-'.$folder->id, filenameReplaceBadChars($folder->name));
 
 										xmllize_tree($xml_data,$dir,$coursedir,$portfoliofile,$folder->name,$scorm_folder,$course,$resources);
-
+										unset($folder,$context,$dir);
 										break;
 								}//end switch
 							}
