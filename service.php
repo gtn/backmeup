@@ -99,22 +99,22 @@ if ($uname!="0" && $pword!="0"){
 														$file = $fs->get_file($wikicontext->id, 'mod_wiki', 'attachments', $urlparts[8], "/", $filename);
 														file_put_contents($coursedir."/".$filename,$file->get_content());
 													} else {
-														$file = file_get_contents($url);
-														file_put_contents($coursedir."/".$filename,$file);
+														if($file = @file_get_contents($url))
+															file_put_contents($coursedir."/".$filename,$file);
 													}
 													$wikicontent = str_replace($url, $filename, $wikicontent);
 												}
 											}
 										}
-										bmu_create_html_file($coursedir,$wiki->name,$wikicontent);
+										bmu_create_html_file($coursedir,$wiki->name,$wikicontent,$wiki->intro);
 										$xml_sequence->addChild("name",$wiki->name);
 										$xml_sequence->addChild("type","wiki");
 										$xml_sequence->addChild("intro",$wiki->intro);
 										$xml_data = $xml_sequence->addChild("data");
 										$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($wiki->name)).'.html');
-										$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$page->timemodified));
+										$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$wiki->timemodified));
 										$xml_file->addAttribute("mime","text/html");
-										
+
 										scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($wiki->name).".html");
 										$scorm_sequence = scorm_create_item($scorm_section, 'ITEM-sequence-'.$course->id.'-'.$sequence->id, $wiki->name,'RES-'.$course->id.'-'.$sequence->id);
 										unset($wiki,$cm,$wikicontent,$wikicontext,$images,$pages,$subwikis);
@@ -124,10 +124,8 @@ if ($uname!="0" && $pword!="0"){
 										$url = $DB->get_record('url',array("id"=>$sequence->instance));
 										if($url) {
 											//create html file
-											$pagefile = fopen($coursedir."/".filenameReplaceBadChars($url->name).".html", 'w');
-											//write content to file
-											fwrite($pagefile, "<a href='".$url->externalurl."'>".$url->externalurl."</a>");
-											fclose($pagefile);
+											$urlcontent = "<a href='".$url->externalurl."'>".$url->externalurl."</a>";
+											bmu_create_html_file($coursedir,filenameReplaceBadChars($wiki->name),$urlcontent,$url->intro);
 											$xml_sequence->addChild("name",$url->name);
 											$xml_sequence->addChild("type","url");
 											$xml_sequence->addChild("intro",$url->intro);
@@ -147,7 +145,7 @@ if ($uname!="0" && $pword!="0"){
 										if($page) {
 											$cm = get_coursemodule_from_instance("page", $sequence->instance);
 											$pagecontext = get_context_instance(CONTEXT_MODULE, $cm->id);
-												
+
 											$page->content = file_rewrite_pluginfile_urls($page->content, 'pluginfile.php', $pagecontext->id, 'mod_page', 'content', 0);
 
 											$images = bmu_get_images($page->content);
@@ -158,12 +156,12 @@ if ($uname!="0" && $pword!="0"){
 													$file = $fs->get_file($pagecontext->id, 'mod_page', 'content', 0, "/", $filename);
 													file_put_contents($coursedir."/".$filename,$file->get_content());
 												} else {
-													$file = file_get_contents($url);
-													file_put_contents($coursedir."/".$filename,$file);
+													if($file = @file_get_contents($url))
+														file_put_contents($coursedir."/".$filename,$file);
 												}
 												$page->content = str_replace($url, $filename, $page->content);
 											}
-											bmu_create_html_file($coursedir,$page->name,$page->content);
+											bmu_create_html_file($coursedir,$page->name,$page->content,$page->intro);
 
 											$xml_sequence->addChild("name",$page->name);
 											$xml_sequence->addChild("type","page");
@@ -285,6 +283,11 @@ if ($uname!="0" && $pword!="0"){
 			$xml_scorm->addChild("file",$portfoliofile."ims_xml.xsd");
 			$xml_scorm->addChild("file",$portfoliofile."imscp_rootv1p1p2.xsd");
 			$xml_scorm->addChild("file",$portfoliofile."imsmd_rootv1p2p1.xsd");
+				
+			bmu_create_theme_files($tempdir_absolute);
+			$xml_theme = $xml->addChild("theme");
+			$xml_theme->addChild("file",$portfoliofile."backmeup.css");
+			$xml_theme->addChild("file",$portfoliofile."bmu_logo.jpg");
 			echo $xml->asXML();
 		}
 			
@@ -409,8 +412,29 @@ function bmu_create_file($path,$filename,$content) {
 	fwrite($file, utf8_decode($content));
 	fclose($file);
 }
-function bmu_create_html_file($path,$filename,$content) {
-	bmu_create_file($path,$filename.".html",$content);
+function bmu_create_html_file($path,$filename,$content,$description="") {
+	$htmlcontent = '<html>
+	<head>
+	<link rel="stylesheet" type="text/css" href="../theme/backmeup.css">
+	</head>
+	<body>
+	<div id="backmeup">
+	<div id="backmeupheader"><img src="../theme/bmu_logo.jpg" alt="backmeup" /></div>
+	<div class="backmeupborder">
+	<h1>'.$filename.'</h1>
+	<p class="description">'.$description.'</p>
+	<p class="content">'.$content.'</p>
+	</div>
+	</div>
+	</body>
+	</html>';
+	bmu_create_file($path,$filename.".html",$htmlcontent);
+}
+function bmu_create_theme_files($path) {
+	mkdir($path."/theme");
+	// copy all necessary files
+	copy("theme/backmeup.css", $path . "/theme/backmeup.css");
+	copy("theme/bmu_logo.jpg", $path . "/theme/bmu_logo.jpg");
 }
 function bmu_create_scorm_file($path,$xml) {
 

@@ -1,0 +1,59 @@
+body { 
+	font-family: 'OpenSansRegular', sans-serif;
+	color:#000;
+	font-size: 15px;
+	background-color:#fff;
+	font-family: 'Ubuntu', sans-serif;
+	}
+
+#backmeup {
+	width: 600px;
+	margin: 10px;
+}
+
+#backmeup h1 {
+	font-family: 'OpenSansBold', sans-serif;
+	font-weight: normal;
+	color:#47aa0d;
+}
+a {
+	color:#47aa0d;
+}
+#backmeupheader {
+	text-align: right;
+}
+
+.backmeupborder {
+	border: 1px solid #47aa0d;
+	background-color: #e8f7ff;
+	padding: 15px;
+	 border-radius:10px;
+  -moz-border-radius:10px;
+  -webkit-border-radius:10px;
+
+}
+
+b, strong {
+font: 'OpenSansBold', Arial, sans-serif;
+  font-weight:normal;
+}
+
+i, em {
+  font: 'OpenSansItalic', Arial, sans-serif;
+  font-style:normal;
+}
+
+.description {
+	font-size: 14px;
+	border-bottom: 1px solid #47aa0d;
+	padding-bottom:15px;
+}
+
+.content {
+
+	padding-top:10px;
+}
+img {
+	width:100px;
+	height:auto;
+}
