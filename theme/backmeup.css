@@ -46,7 +46,6 @@ i, em {
 .description {
 	font-size: 14px;
 	border-bottom: 1px solid #47aa0d;
-	padding-bottom:15px;
 }
 
 .content {
@@ -54,6 +53,6 @@ i, em {
 	padding-top:10px;
 }
 img {
-	width:100px;
+	max-width:200px;
 	height:auto;
 }
