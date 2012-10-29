@@ -2,6 +2,7 @@
 
 require_once dirname(__FILE__) . '/inc.php';
 require_once dirname(__FILE__) . '/lib/lib.php';
+require_once $CFG->dirroot.'/lib/moodlelib.php';
 require_once($CFG->dirroot.'/course/lib.php');
 require_once($CFG->dirroot.'/mod/resource/lib.php');
 require_once($CFG->dirroot.'/mod/wiki/locallib.php');
@@ -9,12 +10,12 @@ require_once($CFG->dirroot.'/mod/wiki/locallib.php');
 global $DB,$user,$COURSE;
 
 $uname = optional_param('username', 0, PARAM_USERNAME);  //100
-$pword = optional_param('password', 0, PARAM_ALPHANUM);	//32
+$pword = optional_param('password', 0, PARAM_RAW);	//32
 $action = optional_param('action',"auth",PARAM_ALPHANUM);
 
 if ($uname!="0" && $pword!="0"){
 
-	if (bmu_check_login($uname,$pword)){
+	if ($user = authenticate_user_login($uname,$pword)){
 		if($action == "auth")
 			bmu_write_auth_xml(true);
 		else if($action == "list") {
