@@ -42,7 +42,7 @@ if ($uname!="0" && $pword!="0"){
 
 				$scorm_course = $scorm_courses->addChild("organization");
 				$scorm_course->addAttribute('identifier', 'COURSE-'.$course->id);
-				$scorm_course->addChild('title',$course->fullname);
+				$scorm_course->addChild('title',bmu_prepare_xml_string($course->fullname));
 
 				$modinfo = get_fast_modinfo($course);
 				
@@ -562,6 +562,11 @@ function bmu_replace_umlaute($text) {
 	$umlautArray = Array("/ä/","/ö/","/ü/","/Ä/","/Ö/","/Ü/","/ß/");
 	$replaceArray = Array("ae","oe","ue","Ae","Oe","Ue","ss");
 	return preg_replace($umlautArray , $replaceArray , $text);
+}
+function bmu_prepare_xml_string($text) {
+	$characterArray = Array("&", "\"", "'", "<", ">");
+	$replaceArray = Array("","","","","");
+	return preg_replace($characterArray, $replaceArray, $text);
 }
 function scorm_create_item($pitem, $identifier, $titletext, $residentifier = '') {
 	// at an external ressource no file is needed inside resource
