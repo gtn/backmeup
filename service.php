@@ -565,8 +565,8 @@ function bmu_replace_umlaute($text) {
 }
 function bmu_prepare_xml_string($text) {
 	$characterArray = Array("&", "\"", "'", "<", ">");
-	$replaceArray = Array("","","","","");
-	return preg_replace($characterArray, $replaceArray, $text);
+	$replaceArray = Array(" ", " "," "," "," ");
+	return str_replace($characterArray, $replaceArray, $text);
 }
 function scorm_create_item($pitem, $identifier, $titletext, $residentifier = '') {
 	// at an external ressource no file is needed inside resource
