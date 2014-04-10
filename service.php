@@ -161,7 +161,7 @@ else if ($uname!="0" && $pword!="0"){
 										}
 										bmu_create_html_file($coursedir,$wiki->name,$wikicontent,$wiki->intro);
 										$xml_sequence->addChild("name",$wiki->name);
-										$xml_sequence->addChild("type","wiki");
+										$xml_sequence->addChild("type","Wiki");
 										$xml_sequence->addChild("intro",$wiki->intro);
 										$xml_data = $xml_sequence->addChild("data");
 
@@ -170,7 +170,7 @@ else if ($uname!="0" && $pword!="0"){
 										}
 
 										$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($wiki->name)).'.html');
-										$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$wiki->timemodified));
+										$xml_file->addAttribute("modified", date("c",$wiki->timemodified));
 										$xml_file->addAttribute("mime","text/html");
 
 										scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($wiki->name).".html");
@@ -185,11 +185,11 @@ else if ($uname!="0" && $pword!="0"){
 											$urlcontent = "<a href='".$url->externalurl."'>".$url->externalurl."</a>";
 											bmu_create_html_file($coursedir,filenameReplaceBadChars($url->name),$urlcontent,$url->intro);
 											$xml_sequence->addChild("name",$url->name);
-											$xml_sequence->addChild("type","url");
+											$xml_sequence->addChild("type","Url");
 											$xml_sequence->addChild("intro",$url->intro);
 											$xml_data = $xml_sequence->addChild("data");
 											$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($url->name)).'.html');
-											$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$url->timemodified));
+											$xml_file->addAttribute("modified", date("c",$url->timemodified));
 											$xml_file->addAttribute("mime","text/html");
 
 											scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($url->name).".html");
@@ -228,14 +228,14 @@ else if ($uname!="0" && $pword!="0"){
 											bmu_create_html_file($coursedir,$page->name,$page->content,$page->intro);
 
 											$xml_sequence->addChild("name",$page->name);
-											$xml_sequence->addChild("type","page");
+											$xml_sequence->addChild("type","Page");
 											$xml_sequence->addChild("intro",$page->intro);
 											$xml_data = $xml_sequence->addChild("data");
 											foreach($newimages as $newimg) {
 												$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(rawurldecode($newimg)));
 											}
 											$xml_file = $xml_data->addChild("file",$portfoliofile.'/'.rawurlencode(filenameReplaceBadChars($page->name)).'.html');
-											$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$page->timemodified));
+											$xml_file->addAttribute("modified", date("c",$page->timemodified));
 											$xml_file->addAttribute("mime","text/html");
 
 											scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($page->name).".html");
@@ -249,7 +249,7 @@ else if ($uname!="0" && $pword!="0"){
 										$submission = $DB->get_record('assign_submission',array("userid"=>$user->id,"assignment"=>$assign->id));
 										if($submission) {
 											$xml_sequence->addChild("name",$assign->name);
-											$xml_sequence->addChild("type","assign");
+											$xml_sequence->addChild("type","Assign");
 											$xml_sequence->addChild("intro",$assign->intro);
 											$xml_data = $xml_sequence->addChild("data");
 
@@ -267,7 +267,7 @@ else if ($uname!="0" && $pword!="0"){
 													$file->copy_content_to($newfile);
 
 													$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
-													$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$submission->timemodified));
+													$xml_file->addAttribute("modified", date("c",$submission->timemodified));
 													$xml_file->addAttribute("mime", $file->get_mimetype());
 
 													scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id.'-'.$file->get_itemid(), "/".filenameReplaceBadChars($course->fullname)."/".$file->get_filename());
@@ -280,7 +280,7 @@ else if ($uname!="0" && $pword!="0"){
 												bmu_create_html_file($coursedir,$assign->name,$onlinetext->onlinetext);
 
 												$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode(filenameReplaceBadChars($assign->name)).'.html');
-												$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$submission->timemodified));
+												$xml_file->addAttribute("modified", date("c",$submission->timemodified));
 												$xml_file->addAttribute("mime", "text/html");
 
 												scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".filenameReplaceBadChars($assign->name).".html");
@@ -310,11 +310,11 @@ else if ($uname!="0" && $pword!="0"){
 										$file->copy_content_to($newfile);
 
 										$xml_sequence->addChild("name",$resource->name);
-										$xml_sequence->addChild("type","resource");
+										$xml_sequence->addChild("type","Resource");
 										$xml_sequence->addChild("intro",$resource->intro);
 										$xml_data = $xml_sequence->addChild("data");
 										$xml_file = $xml_data->addChild("file",$portfoliofile."/".rawurlencode($file->get_filename()));
-										$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$resource->timemodified));
+										$xml_file->addAttribute("modified", date("c",$resource->timemodified));
 										$xml_file->addAttribute("mime", $file->get_mimetype());
 
 										scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$sequence->id, "/".filenameReplaceBadChars($course->fullname)."/".$file->get_filename());
@@ -332,7 +332,7 @@ else if ($uname!="0" && $pword!="0"){
 										$dir = $fs->get_area_tree($context->id, 'mod_folder', 'content', 0);
 
 										$xml_sequence->addChild("name",filenameReplaceBadChars($folder->name));
-										$xml_sequence->addChild("type","folder");
+										$xml_sequence->addChild("type","Folder");
 										$xml_sequence->addChild("intro",$folder->intro);
 										$xml_data = $xml_sequence->addChild("data");
 
@@ -499,7 +499,7 @@ function xmllize_tree($parent_element,$dir,$coursedir,$portfoliofile,$foldername
 		$url = str_replace(' ','%20', $url);
 		$xml_file = $parent_element->addChild("file",$url);
 		$xml_file->addAttribute("path",$foldername);
-		$xml_file->addAttribute("modified", date("d.m.Y H:i:s",$file->get_timemodified()));
+		$xml_file->addAttribute("modified", date("c",$file->get_timemodified()));
 		$xml_file->addAttribute("mime",$file->get_mimetype());
 
 		scorm_create_ressource($resources, 'RES-'.$course->id.'-'.$file->get_id(), "/".filenameReplaceBadChars($course->fullname)."/".$foldername."/".$file->get_filename());
