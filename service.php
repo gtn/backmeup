@@ -44,8 +44,10 @@ if ($uname!="0" && $pword!="0"){
 				$scorm_course->addAttribute('identifier', 'COURSE-'.$course->id);
 				$scorm_course->addChild('title',$course->fullname);
 
-
-				$sections = get_all_sections($course->id);
+				$modinfo = get_fast_modinfo($course);
+				
+				$sections = $modinfo->get_section_info_all();
+//				$sections = get_all_sections($course->id);
 				foreach($sections as $section) {
 					$xml_section = $xml_course->addChild("section");
 					$xml_section->addAttribute("id", $section->id);
@@ -109,7 +111,8 @@ if ($uname!="0" && $pword!="0"){
 									case $modules['wiki']:
 										$wiki = wiki_get_wiki($sequence->instance);
 										$cm = get_coursemodule_from_instance("wiki", $sequence->instance);
-										$wikicontext = get_context_instance(CONTEXT_MODULE, $cm->id);
+										//$wikicontext = get_context_instance(CONTEXT_MODULE, $cm->id);
+										$wikicontext = context_module::instance($cm->id);
 										$wikicontent="";
 										$newimages=array();
 										$subwikis = wiki_get_subwikis($sequence->instance);
@@ -192,8 +195,8 @@ if ($uname!="0" && $pword!="0"){
 										$page = $DB->get_record('page',array("id"=>$sequence->instance));
 										if($page) {
 											$cm = get_coursemodule_from_instance("page", $sequence->instance);
-											$pagecontext = get_context_instance(CONTEXT_MODULE, $cm->id);
-
+										//	$pagecontext = get_context_instance(CONTEXT_MODULE, $cm->id);
+											$pagecontext = context_module::instance($cm->id);
 											$page->content = file_rewrite_pluginfile_urls($page->content, 'pluginfile.php', $pagecontext->id, 'mod_page', 'content', 0);
 
 											$images = bmu_get_images($page->content);
@@ -244,7 +247,9 @@ if ($uname!="0" && $pword!="0"){
 											$xml_data = $xml_sequence->addChild("data");
 
 											// check if files are submitted
-											$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+											//$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+											//$context = context_module::instance_by_id($sequence->id);
+												$context = context_module::instance($sequence->id);
 											$fs = get_file_storage();
 											$files = $fs->get_area_files($context->id, 'assignsubmission_file', 'submission_files');
 
@@ -282,7 +287,9 @@ if ($uname!="0" && $pword!="0"){
 										//get resource
 										$resource = $DB->get_record('resource',array("id"=>$sequence->instance));
 										//get file
-										$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+										//$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+										$context = context_module::instance($sequence->id);
+										
 										if (!has_capability('mod/resource:view', $context))
 											continue;
 											
@@ -311,7 +318,9 @@ if ($uname!="0" && $pword!="0"){
 									case $modules['folder']:
 										$folder = $DB->get_record('folder',array("id"=>$sequence->instance));
 
-										$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+										//$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
+										$context = context_module::instance($sequence->id);
+										
 										$dir = $fs->get_area_tree($context->id, 'mod_folder', 'content', 0);
 
 										$xml_sequence->addChild("name",filenameReplaceBadChars($folder->name));
@@ -432,7 +441,9 @@ function bmu_valid_zip_name($zipname) {
 }
 function bmu_sequence_available($item, $courseid) {
 	global $CFG,$user;
-	$modcontext = get_context_instance(CONTEXT_MODULE, $item->id);
+	//$modcontext = get_context_instance(CONTEXT_MODULE, $item->id);
+	//$modcontext = context_module::instance_by_id($item->id);
+	$modcontext = context_module::instance($item->id);
 	$available = true;
 	// Test dates
 	if ($item->availablefrom) {
