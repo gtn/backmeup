@@ -7,13 +7,20 @@ require_once($CFG->dirroot.'/course/lib.php');
 require_once($CFG->dirroot.'/mod/resource/lib.php');
 require_once($CFG->dirroot.'/mod/wiki/locallib.php');
 
-global $DB,$user,$COURSE;
+global $DB,$user,$COURSE,$CFG;
 
 $uname = optional_param('username', 0, PARAM_USERNAME);  //100
 $pword = optional_param('password', 0, PARAM_RAW);	//32
 $action = optional_param('action',"auth",PARAM_ALPHANUM);
+$folder = optional_param('folder','',PARAM_PATH);
 
-if ($uname!="0" && $pword!="0"){
+if($folder != '') {
+	if(file_exists($CFG->dataroot."/".$folder)) {
+		remove_dir($CFG->dataroot."/".$folder,true);
+		rmdir($CFG->dataroot."/".$folder);
+	}
+}
+else if ($uname!="0" && $pword!="0"){
 
 	if ($user = authenticate_user_login($uname,$pword)){
 		if($action == "auth")
@@ -321,6 +328,7 @@ if ($uname!="0" && $pword!="0"){
 										//$context = get_context_instance(CONTEXT_MODULE, $sequence->id);
 										$context = context_module::instance($sequence->id);
 										
+										$fs = get_file_storage();
 										$dir = $fs->get_area_tree($context->id, 'mod_folder', 'content', 0);
 
 										$xml_sequence->addChild("name",filenameReplaceBadChars($folder->name));
@@ -375,6 +383,10 @@ if ($uname!="0" && $pword!="0"){
 			$xml_theme = $xml->addChild("theme");
 			$xml_theme->addChild("file",$portfoliofile."theme/backmeup.css");
 			$xml_theme->addChild("file",$portfoliofile."theme/bmu_logo.jpg");
+			
+			$xml_delete = $xml->addChild("delete");
+			$xml_delete->addChild("file",$CFG->wwwroot . '/blocks/backmeup/service.php?folder='.$tempdir);
+			
 			echo $xml->asXML();
 		}
 			
@@ -564,6 +576,7 @@ function bmu_replace_umlaute($text) {
 	return preg_replace($umlautArray , $replaceArray , $text);
 }
 function bmu_prepare_xml_string($text) {
+	return $text;
 	$characterArray = Array("&", "\"", "'", "<", ">");
 	$replaceArray = Array(" ", " "," "," "," ");
 	return str_replace($characterArray, $replaceArray, $text);
