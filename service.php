@@ -14,7 +14,7 @@ $pword = optional_param('password', 0, PARAM_RAW);	//32
 $action = optional_param('action',"auth",PARAM_ALPHANUM);
 $folder = optional_param('folder','',PARAM_PATH);
 
-if($folder != '') {
+if($folder != '' && strstr($folder, "bmu/temp/exportdata") == 0) {
 	if(file_exists($CFG->dataroot."/".$folder)) {
 		remove_dir($CFG->dataroot."/".$folder,true);
 		rmdir($CFG->dataroot."/".$folder);
