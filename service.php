@@ -576,7 +576,6 @@ function bmu_replace_umlaute($text) {
 	return preg_replace($umlautArray , $replaceArray , $text);
 }
 function bmu_prepare_xml_string($text) {
-	return $text;
 	$characterArray = Array("&", "\"", "'", "<", ">");
 	$replaceArray = Array(" ", " "," "," "," ");
 	return str_replace($characterArray, $replaceArray, $text);
